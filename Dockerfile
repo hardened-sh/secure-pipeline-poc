@@ -30,11 +30,12 @@ RUN go mod download 2>/dev/null || true
 COPY . .
 
 # Build com flags de segurança
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+RUN mkdir -p /app && \
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
     -ldflags='-w -s -extldflags "-static"' \
     -o /app/server ./cmd/server 2>/dev/null || \
-    echo "package main\nfunc main() { println(\"Hardened App Running\") }" > main.go && \
-    CGO_ENABLED=0 go build -ldflags='-w -s' -o /app/server .
+    (printf 'package main\n\nfunc main() { println("Hardened App Running") }\n' > main.go && \
+    CGO_ENABLED=0 go build -ldflags='-w -s' -o /app/server .)
 
 # =============================================================================
 # Stage 2: Runtime (Distroless)
