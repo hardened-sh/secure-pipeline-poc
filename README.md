@@ -1,4 +1,4 @@
-# Pipeline Hardening PoC
+# 🔒Pipeline Hardening PoC
 
 PoC que montei pra estudar hardening de pipeline CI/CD. Comecei depois de ler sobre o caso do Codecov e ficar incomodado com o tanto de pipeline que eu já tinha subido sem pensar direito em supply chain. Runner com root, secret estática colada no repo, zero verificação de integridade — o básico do que não deveria existir.
 
