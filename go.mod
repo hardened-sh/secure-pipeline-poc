@@ -1,4 +1,4 @@
-module github.com/hardened-sh/secure-pipeline-poc
+module github.com/meluansantos/secure-pipeline-poc
 
 go 1.22
 

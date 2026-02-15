@@ -1,93 +1,50 @@
-# 🔒 Pipeline Hardening PoC
+# Pipeline Hardening PoC
 
-Este repositório é um **laboratório de estudos** focado em segurança de infraestrutura e CI/CD. O objetivo aqui foi sair da superfície e entender como blindar uma esteira de build contra ataques reais de *Supply Chain*.
+PoC que montei pra estudar hardening de pipeline CI/CD. Comecei depois de ler sobre o caso do Codecov e ficar incomodado com o tanto de pipeline que eu já tinha subido sem pensar direito em supply chain. Runner com root, secret estática colada no repo, zero verificação de integridade — o básico do que não deveria existir.
 
-⚠️ **Nota de estudo**: Este projeto contém configurações propositalmente complexas para testar limites de hardening.
+O repositório não é um projeto de produção. É um lab onde eu fui testando cada contramedida separadamente até entender o que realmente faz diferença e o que é teatro de segurança.
 
-## 🧠 Por que este lab?
+## O que tem aqui
 
-A maioria dos pipelines por aí é um "buraco negro" de segurança: runners com permissão de root, segredos expostos em variáveis de ambiente e binários que ninguém sabe de onde vieram.
+Branch protection configurada via workflow agendado, não na mão. Commits assinados, 2 approvals obrigatórios, enforce em admin. Parece exagero, mas force-push na main é literalmente como um atacante apaga evidência depois de injetar código.
 
-Neste lab, eu me forcei a resolver 4 dores que tiram o sono de qualquer engenheiro que se preocupa com o sistema além da interface:
+O build usa OIDC pra autenticar na AWS em vez de `AWS_ACCESS_KEY` fixa. O runner pega um JWT do GitHub, troca por credencial temporária com escopo limitado. Se o runner for comprometido, a credencial morre em minutos.
 
-### 1. O fim do "Force-Push" e da bagunça na Main
+Pra integridade dos artefatos: SBOM gerado com Syft (SPDX + CycloneDX) e assinatura keyless com Cosign via Sigstore. Dá pra qualquer um verificar que a imagem saiu desse repo e que ninguém trocou camada entre o build e o deploy.
 
-Confiar apenas na boa vontade do time não é estratégia de segurança.
-
-* **A dor:** Alguém apagar o histórico de commits maliciosos ou pular o build.
-* **O que implementei:** Proteção de branch via código, exigindo commits assinados e aprovação dupla obrigatória. Nem admin passa sem revisão.
-
-### 2. Chega de "AWS_ACCESS_KEY" estática
-
-Segredo em variável de ambiente é um desastre esperando para acontecer.
-
-* **A dor:** Se o runner for invadido, suas chaves da AWS já eram.
-* **O que implementei:** Autenticação via **OIDC**. O GitHub Actions conversa com a AWS e recebe uma credencial temporária que expira em minutos. Sem chaves fixas, sem vazamentos permanentes.
-
-### 3. "Quem buildou isso?" (SBOM + Cosign)
-
-Garantir a integridade do que vai para produção.
-
-* **A dor:** Um atacante pode trocar o binário dentro do container sem mudar a tag da imagem.
-* **O que implementei:** Geração de **SBOM (Syft)** para saber exatamente cada lib que está lá dentro e assinatura digital da imagem com **Cosign**. Se a assinatura não bater, o deploy nem começa.
-
-### 4. Isolamento Real: gVisor + Falco
-
-Parar de confiar cegamente no isolamento padrão do Docker.
-
-* **A dor:** O clássico *Container Escape* via `docker.sock`.
-* **O que implementei:** * **gVisor (runsc):** Um kernel em user-space que intercepta syscalls. Se o atacante tentar algo no kernel do host, ele bate no muro do gVisor.
-* **Falco:** Monitoramento de comportamento estranho em tempo real (ex: alguém tentando abrir um reverse shell no build).
-
-
-
----
-
-## 📁 O que tem aqui dentro?
-
-```text
-.
-├── .github/workflows/       # Onde a mágica do hardening acontece
-├── config/                  # Configurações de runtime (gVisor e Falco)
-├── cmd/server/              # Um servidor simples em Go para testar a esteira
-├── Dockerfile               # Build multi-stage focado em reduzir superfície de ataque
-└── go.mod                   # Gestão de dependências
+A parte de runtime foi a que mais apanhei. O gVisor (`runsc`) coloca um kernel em user-space entre o container e o host — o container nunca faz syscall direto no kernel real. O Falco fica em cima monitorando comportamento suspeito (reverse shell, acesso ao `docker.sock`, ptrace, etc). As regras customizadas tão em `config/falco/`.
 
 ```
+.github/workflows/    -> build, scan de secrets, branch protection
+config/               -> regras Falco, scripts de setup do runner
+cmd/server/           -> servidor Go básico pra ter algo pra buildar
+Dockerfile            -> multi-stage, distroless, non-root
+```
 
-## 🛠️ Como testar as contra-medidas
+## Testando
 
-### 1. Verificando a Assinatura (Cosign)
-
-Para garantir que a imagem não foi alterada após o build:
+Verificar assinatura:
 
 ```bash
 cosign verify \
   --certificate-identity-regexp="https://github.com/meluansantos/secure-pipeline-poc.*" \
   --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
   ghcr.io/meluansantos/secure-pipeline-poc:main
-
 ```
 
-### 2. Validando o isolamento do Runtime
-
-Se você rodar o runner self-hosted configurado, o container deve rodar sob o kernel do gVisor:
+gVisor (precisa de runner self-hosted):
 
 ```bash
 docker run --rm --runtime=runsc hello-world
-
 ```
 
----
+## Referências
 
-## 📚 Aprendizados e Referências
-
-Este projeto foi construído estudando os fundamentos de:
-
-* [gVisor Documentation](https://gvisor.dev/docs/) - Isolamento de kernel.
-* [Sigstore/Cosign](https://docs.sigstore.dev/) - Assinatura de artefatos.
-* [SLSA Framework](https://slsa.dev/) - Níveis de segurança para cadeias de suprimento.
+* [gVisor docs](https://gvisor.dev/docs/)
+* [Sigstore/Cosign](https://docs.sigstore.dev/)
+* [SLSA Framework](https://slsa.dev/)
+* [Codecov incident](https://about.codecov.io/security-update/)
 
 ---
 
-**Laboratório mantido por Luan Rodrigues** [luansantos.net/lab](https://luansantos.net/lab)
+Mantido por Luan Rodrigues — [luansantos.net/lab](https://luansantos.net/lab)

@@ -1,4 +1,3 @@
-# .github/workflows/branch-protect.yml
 name: Protect Main
 on:
   schedule:
@@ -7,7 +6,7 @@ jobs:
   protect:
     runs-on: ubuntu-latest
     steps:
-      - uses: hardened-sh/create-or-update-protected-branch@v2
+      - uses: meluansantos/create-or-update-protected-branch@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.repository }}
@@ -20,4 +19,3 @@ jobs:
           required_approving_review_count: 2
           enforce_admins: true
           require_signed_commits: true
-

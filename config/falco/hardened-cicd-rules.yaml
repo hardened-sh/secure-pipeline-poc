@@ -1,21 +1,3 @@
-# =============================================================================
-# Falco Rules - Detecção de Container Escape e Comportamento Malicioso
-# =============================================================================
-# Falco monitora eventos de syscalls críticos (ex.: execve de binários 
-# inesperados, criação de sockets privilegiados) e gera alertas em tempo real.
-#
-# Para instalar Falco:
-#   sudo apt-get install -y falco
-#   sudo systemctl start falco
-# =============================================================================
-
-# Arquivo: /etc/falco/rules.d/hardened-cicd.yaml
-# Copiar este arquivo para o diretório de regras do Falco
-
-# =============================================================================
-# Regras para detecção de escapes de container em pipelines CI/CD
-# =============================================================================
-
 - rule: Detect Container Escape via Docker Socket
   desc: Detecta tentativas de escape de container via docker.sock
   condition: >
@@ -144,10 +126,6 @@
   priority: CRITICAL
   tags: [process, injection]
 
-# =============================================================================
-# Macros auxiliares
-# =============================================================================
-
 - macro: spawned_process
   condition: evt.type = execve and evt.dir = <
 
@@ -159,10 +137,6 @@
 
 - macro: container
   condition: container.id != host
-
-# =============================================================================
-# Listas de processos permitidos/bloqueados
-# =============================================================================
 
 - list: allowed_ci_processes
   items: [git, make, gcc, npm, node, python, pip, docker, cosign, syft, gitleaks]

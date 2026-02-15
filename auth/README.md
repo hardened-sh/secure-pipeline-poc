@@ -4,7 +4,7 @@ Este diretório contém módulos de autenticação.
 
 Conforme definido no [CODEOWNERS](../.github/CODEOWNERS), alterações neste diretório requerem aprovação de:
 
-- @hardened-sh
+- @meluansantos
 - @sec-lead
 
 ## Segurança
